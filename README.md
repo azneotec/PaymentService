@@ -55,7 +55,7 @@ The gateway credentials and the database are read from these properties:
 | `razorpay.key.id`, `razorpay.key.secret`, `razorpay.webhook.secret` | Optional: only when Razorpay is the gateway (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`) |
 | `spring.datasource.*` | MySQL transaction log; `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`. Defaults to the compose MySQL on port 3307, database `payment_service` (created by `createDatabaseIfNotExist`; Flyway creates the tables) |
 | `eureka.client.enabled` | `EUREKA_CLIENT_ENABLED`, default `true`. Token validation finds user-auth-service through Eureka, so with it `false` every authenticated request answers 503 |
-| `server.port` | `SERVER_PORT`, default 8082 |
+| `server.port` | `SERVER_PORT`, default 8005 |
 
 For local development, copy the example file and fill in your keys:
 
@@ -68,14 +68,14 @@ The app loads `.env` from the working directory on startup (via `spring.config.i
 ## Running
 
 ```bash
-make up        # MySQL + Kafka from docker-compose.yml, then the app on :8082 (make down stops them)
+make up        # MySQL + Kafka from docker-compose.yml, then the app on :8005 (make down stops them)
 make run       # just the app, with .env loaded (MySQL and Kafka already running)
 ./mvnw spring-boot:run
 ```
 
 `make help` lists the other targets (`jar`, `test`, `test-integration`, `infra-up`, `infra-down`, `infra-reset`). The root Makefile starts the whole system instead: `make payment` from the repository root.
 
-The service starts on `http://localhost:8082`.
+The service starts on `http://localhost:8005`.
 
 To build a jar and run it:
 
@@ -83,6 +83,21 @@ To build a jar and run it:
 ./mvnw clean package
 java -jar target/PaymentService-0.0.1-SNAPSHOT.jar
 ```
+
+### Run in Docker
+
+The `Dockerfile` builds and runs only this service; MySQL, Kafka and Eureka stay outside and are reached through environment variables. `localhost` inside the container is the container itself, so the addresses must be overridden (`host.docker.internal` reaches services published on the host):
+
+```bash
+docker build -t payment-service .
+docker run --rm -p 8005:8005 -e STRIPE_API_KEY=sk_test_... [-e STRIPE_WEBHOOK_SECRET=whsec_...] \
+  -e DB_URL='jdbc:mysql://host.docker.internal:3307/payment_service?createDatabaseIfNotExist=true' \
+  -e SPRING_KAFKA_BOOTSTRAP_SERVERS=host.docker.internal:9092 \
+  -e EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://host.docker.internal:8761/eureka/ \
+  payment-service
+```
+
+The image carries no `.env` (it is in `.dockerignore`), runs as a non-root user, and has a health check on `/actuator/health`. With `EUREKA_CLIENT_ENABLED=false` the container runs without a registry, but authenticated requests then answer 503.
 
 Run the tests with `./mvnw test` (no database needed). `make test-integration` also boots the full context against MySQL on 3307, which checks the Flyway migration against the JPA mappings.
 
@@ -105,7 +120,7 @@ Creates a payment link with the default gateway and returns its short URL as pla
 **Example**
 
 ```bash
-curl -X POST http://localhost:8082/payment \
+curl -X POST http://localhost:8005/payment \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

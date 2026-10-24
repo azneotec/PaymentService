@@ -4,7 +4,7 @@
 # MySQL on 3307, Kafka on 9092). Spring resolves them at runtime, so the jar contains only ${...} placeholders,
 # never the values. The root Makefile of the monorepo runs the whole stack instead (`make payment`).
 #
-#   make up        start MySQL and Kafka, then run the app in the foreground on :8082
+#   make up        start MySQL and Kafka, then run the app in the foreground on :8005
 #   make down      stop MySQL and Kafka (keeps their data)
 
 SHELL      := /bin/bash
@@ -32,7 +32,7 @@ jar: ## Build the jar (tests skipped by default; use SKIP_TESTS=false to run the
 	@$(WITH_ENV) ./mvnw clean package -DskipTests=$(SKIP_TESTS)
 	@echo "Built $(JAR)"
 
-run: env ## Run the jar with .env loaded (builds it first if missing; SERVER_PORT=9082 make run starts a second instance)
+run: env ## Run the jar with .env loaded (builds it first if missing; SERVER_PORT=9005 make run starts a second instance)
 	@test -f $(JAR) || $(MAKE) --no-print-directory jar
 	@$(WITH_ENV) java -jar $(JAR)
 

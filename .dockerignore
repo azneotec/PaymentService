@@ -1,0 +1,10 @@
+# Keep the build context small and keep local secrets out of the image.
+.env
+.git
+.idea
+.run
+target
+HELP.md
+*.md
+docker-compose.yml
+Dockerfile
