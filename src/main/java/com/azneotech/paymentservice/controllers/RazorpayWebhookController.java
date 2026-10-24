@@ -1,7 +1,7 @@
 package com.azneotech.paymentservice.controllers;
 
 import com.azneotech.paymentservice.messaging.PaymentResultMessage;
-import com.azneotech.paymentservice.messaging.PaymentResultPublisher;
+import com.azneotech.paymentservice.services.PaymentLedger;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.razorpay.RazorpayException;
@@ -18,8 +18,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Receives Razorpay's payment-link webhooks and reports the outcome to OrderManagementService on
- * {@code payment-result}. The payment link was created with the order number as its {@code reference_id}, which
+ * Receives Razorpay's payment-link webhooks, logs them in the {@link PaymentLedger} and reports the outcome to
+ * OrderManagementService on {@code payment-result}. The payment link was created with the order number as its {@code reference_id}, which
  * is how the event finds its order. Anything without a valid signature is rejected, because this endpoint
  * decides whether an order is treated as paid.
  */
@@ -30,14 +30,14 @@ public class RazorpayWebhookController {
     private static final Logger log = LoggerFactory.getLogger(RazorpayWebhookController.class);
 
     private final ObjectMapper objectMapper;
-    private final PaymentResultPublisher resultPublisher;
+    private final PaymentLedger paymentLedger;
     private final String webhookSecret;
 
     public RazorpayWebhookController(ObjectMapper objectMapper,
-                                     PaymentResultPublisher resultPublisher,
+                                     PaymentLedger paymentLedger,
                                      @Value("${razorpay.webhook.secret}") String webhookSecret) {
         this.objectMapper = objectMapper;
-        this.resultPublisher = resultPublisher;
+        this.paymentLedger = paymentLedger;
         this.webhookSecret = webhookSecret;
     }
 
@@ -69,8 +69,9 @@ public class RazorpayWebhookController {
             return ResponseEntity.ok().build();
         }
 
-        resultPublisher.publish(new PaymentResultMessage(orderNumber, status, null,
-                status == PaymentResultMessage.Status.FAILED ? "Payment link " + event.path("event").asText().substring("payment_link.".length()) : null));
+        JsonNode payment = event.path("payload").path("payment").path("entity");
+        paymentLedger.recordOutcome(orderNumber, status, "RAZORPAY", payment.path("id").asText(null), payment.path("method").asText(null),
+                status == PaymentResultMessage.Status.FAILED ? "Payment link " + event.path("event").asText().substring("payment_link.".length()) : null);
         return ResponseEntity.ok().build();
     }
 

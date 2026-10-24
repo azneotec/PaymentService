@@ -10,6 +10,13 @@ public class PaymentService {
     @Autowired
     private IPaymentGateway paymentGateway;
 
+    @Autowired
+    private PaymentLedger paymentLedger;
+
+    /**
+     * Creates the payment link and logs it. An order that is already paid is refused before the gateway is
+     * called, with {@code PaymentAlreadyPaidException}.
+     */
     public String getPaymentLink(
             Long amount,
             String phoneNumber,
@@ -17,7 +24,11 @@ public class PaymentService {
             String email,
             String orderId
     ) {
-        return paymentGateway.getPaymentLink(amount, phoneNumber, name, email, orderId);
+        paymentLedger.assertNotPaid(orderId);
+        String link = paymentGateway.getPaymentLink(amount, phoneNumber, name, email, orderId);
+        paymentLedger.recordLinkCreated(orderId, amount, paymentGateway.currency(), paymentGateway.name(),
+                name, email, phoneNumber, link);
+        return link;
     }
 
 }

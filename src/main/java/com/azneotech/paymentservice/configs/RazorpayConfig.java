@@ -11,12 +11,13 @@ import java.time.Clock;
 @Configuration
 public class RazorpayConfig {
 
-    @Value("${razorpay.key.id}")
+    @Value("${razorpay.key.id:}")
     private String razorpayKeyId;
 
-    @Value("${razorpay.key.secret}")
+    @Value("${razorpay.key.secret:}")
     private String razorpayKeySecret;
 
+    /** Built even without keys (Razorpay is not the default gateway); creating a link then fails with Razorpay's own auth error. */
     @Bean
     public RazorpayClient getRazorpayClient() throws RazorpayException {
         return new RazorpayClient(razorpayKeyId, razorpayKeySecret);

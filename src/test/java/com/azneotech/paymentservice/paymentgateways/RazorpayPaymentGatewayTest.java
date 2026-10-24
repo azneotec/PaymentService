@@ -69,9 +69,9 @@ class RazorpayPaymentGatewayTest {
     }
 
     @Test
-    void isTheDefaultGatewayAndStripeIsNot() throws Exception {
-        assertThat(RazorpayPaymentGateway.class.isAnnotationPresent(Primary.class)).isTrue();
-        assertThat(StripePaymentGateway.class.isAnnotationPresent(Primary.class)).isFalse();
+    void isNotTheDefaultGatewayStripeIs() throws Exception {
+        assertThat(RazorpayPaymentGateway.class.isAnnotationPresent(Primary.class)).isFalse();
+        assertThat(StripePaymentGateway.class.isAnnotationPresent(Primary.class)).isTrue();
     }
 
 }

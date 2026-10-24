@@ -1,0 +1,76 @@
+# Everything PaymentService needs to run locally: MySQL, and Kafka (+ topics, + UI).
+# Start with `make infra-up` (or `docker compose up -d --wait`), stop with `make infra-down`.
+# The service itself runs on the host: `make run` or `./mvnw spring-boot:run`. Eureka is optional: see .env.example.
+#
+# This stack binds the same host ports as the monorepo's root docker-compose.yml, NotificationService/ and
+# OrderManagementService/docker-compose.yml (3307, 9092, 8090), so run only one of them at a time.
+name: payment-service
+
+services:
+  # Host port defaults to 3307 because a MySQL installed on the host usually owns 3306.
+  # Override with MYSQL_PORT and point DB_URL at the same port.
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: payment_service # Flyway creates the tables on first start
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -ppassword --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  # Single-node KRaft broker, advertised as localhost:9092 so the service on the host connects with the
+  # default spring.kafka.bootstrap-servers.
+  kafka:
+    image: apache/kafka:4.3.1
+    ports:
+      - "9092:9092"
+      - "8090:8090" # Kafka UI (kafka-ui shares this container's network, see below)
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
+
+  # One-shot job: creates the topics the service talks on, then exits. payment-requested and payment-result have
+  # 3 partitions, as in the root compose; order-notification carries the receipt emails NotificationService sends.
+  # Shares the broker's network namespace because the broker advertises localhost:9092, which only resolves
+  # correctly from inside that namespace.
+  kafka-init:
+    image: apache/kafka:4.3.1
+    depends_on:
+      kafka:
+        condition: service_healthy
+    network_mode: "service:kafka"
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic payment-requested --partitions 3 --replication-factor 1 &&
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic payment-result --partitions 3 --replication-factor 1 &&
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic order-notification --partitions 1 --replication-factor 1
+
+  # Web UI: http://localhost:8090 (same network-namespace trick as kafka-init).
+  kafka-ui:
+    image: ghcr.io/kafbat/kafka-ui:latest
+    depends_on:
+      kafka:
+        condition: service_healthy
+    network_mode: "service:kafka"
+    environment:
+      SERVER_PORT: 8090
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: localhost:9092
+
+volumes:
+  mysql-data:
+  kafka-data:

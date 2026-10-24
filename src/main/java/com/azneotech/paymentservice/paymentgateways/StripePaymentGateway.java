@@ -7,14 +7,16 @@ import com.stripe.model.Price;
 import com.stripe.param.PaymentLinkCreateParams;
 import com.stripe.param.PriceCreateParams;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 /**
  * Creates a one-time Stripe payment link for an order. The order number is stored in the link's metadata, which
  * Stripe copies onto the checkout session, so {@code StripeWebhookController} can tell which order was paid.
- * Not the default gateway (see {@link RazorpayPaymentGateway}); inject it by type to use it.
+ * The default gateway ({@code @Primary}); {@link RazorpayPaymentGateway} is the alternative.
  */
 @Component
+@Primary
 public class StripePaymentGateway implements IPaymentGateway {
 
     /** Metadata key holding the order number on the payment link and its checkout sessions. */
@@ -32,6 +34,16 @@ public class StripePaymentGateway implements IPaymentGateway {
         this.stripeApiKey = stripeApiKey;
         this.currency = currency;
         this.redirectUrl = redirectUrl;
+    }
+
+    @Override
+    public String name() {
+        return "STRIPE";
+    }
+
+    @Override
+    public String currency() {
+        return currency.toUpperCase();
     }
 
     @Override

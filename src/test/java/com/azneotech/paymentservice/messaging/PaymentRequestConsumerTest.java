@@ -1,11 +1,14 @@
 package com.azneotech.paymentservice.messaging;
 
+import com.azneotech.paymentservice.exceptions.PaymentAlreadyPaidException;
 import com.azneotech.paymentservice.services.PaymentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.kafka.annotation.KafkaListener;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -42,6 +45,25 @@ class PaymentRequestConsumerTest {
         consumer.onPaymentRequested(REQUEST);
 
         verify(publisher).publish(new PaymentResultMessage("ORD-1", PaymentResultMessage.Status.FAILED, null, "Could not create a payment link"));
+    }
+
+    @Test
+    void reportsPaidAgainWhenTheOrderIsAlreadyPaid() {
+        when(paymentService.getPaymentLink(anyLong(), anyString(), anyString(), anyString(), anyString()))
+                .thenThrow(new PaymentAlreadyPaidException("ORD-1"));
+
+        consumer.onPaymentRequested(REQUEST);
+
+        verify(publisher).publish(new PaymentResultMessage("ORD-1", PaymentResultMessage.Status.PAID, null, null));
+    }
+
+    @Test
+    void leavesTheRequestForRedeliveryWhenTheTransactionLogIsDown() {
+        when(paymentService.getPaymentLink(anyLong(), anyString(), anyString(), anyString(), anyString()))
+                .thenThrow(new DataAccessResourceFailureException("db down"));
+
+        assertThatThrownBy(() -> consumer.onPaymentRequested(REQUEST)).isInstanceOf(DataAccessResourceFailureException.class);
+        verifyNoInteractions(publisher);
     }
 
     @Test

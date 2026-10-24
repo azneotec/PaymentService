@@ -1,8 +1,8 @@
 package com.azneotech.paymentservice.controllers;
 
 import com.azneotech.paymentservice.messaging.PaymentResultMessage;
-import com.azneotech.paymentservice.messaging.PaymentResultPublisher;
 import com.azneotech.paymentservice.paymentgateways.StripePaymentGateway;
+import com.azneotech.paymentservice.services.PaymentLedger;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stripe.exception.SignatureVerificationException;
@@ -19,8 +19,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Receives Stripe's checkout events for payment links and reports the outcome to OrderManagementService on
- * {@code payment-result}. The order is found from the {@code orderId} metadata {@link StripePaymentGateway} puts on
+ * Receives Stripe's checkout events for payment links, logs them in the {@link PaymentLedger} and reports the
+ * outcome to OrderManagementService on {@code payment-result}. The order is found from the {@code orderId} metadata {@link StripePaymentGateway} puts on
  * the link. Anything without a valid {@code Stripe-Signature} is rejected, because this endpoint decides whether an
  * order is treated as paid.
  */
@@ -31,14 +31,14 @@ public class StripeWebhookController {
     private static final Logger log = LoggerFactory.getLogger(StripeWebhookController.class);
 
     private final ObjectMapper objectMapper;
-    private final PaymentResultPublisher resultPublisher;
+    private final PaymentLedger paymentLedger;
     private final String webhookSecret;
 
     public StripeWebhookController(ObjectMapper objectMapper,
-                                   PaymentResultPublisher resultPublisher,
+                                   PaymentLedger paymentLedger,
                                    @Value("${stripe.webhook.secret:}") String webhookSecret) {
         this.objectMapper = objectMapper;
-        this.resultPublisher = resultPublisher;
+        this.paymentLedger = paymentLedger;
         this.webhookSecret = webhookSecret;
     }
 
@@ -79,8 +79,8 @@ public class StripeWebhookController {
             return ResponseEntity.ok().build();
         }
 
-        resultPublisher.publish(new PaymentResultMessage(orderNumber, status, null,
-                status == PaymentResultMessage.Status.FAILED ? "Payment failed or the payment link expired" : null));
+        paymentLedger.recordOutcome(orderNumber, status, "STRIPE", session.path("payment_intent").asText(null), null,
+                status == PaymentResultMessage.Status.FAILED ? "Payment failed or the payment link expired" : null);
         return ResponseEntity.ok().build();
     }
 

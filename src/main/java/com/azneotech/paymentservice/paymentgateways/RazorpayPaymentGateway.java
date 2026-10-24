@@ -5,15 +5,13 @@ import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.Duration;
 
-/** The default gateway: creates a Razorpay payment link whose {@code reference_id} is the order number. */
+/** Creates a Razorpay payment link whose {@code reference_id} is the order number. Not the default (see {@link StripePaymentGateway}). */
 @Component
-@Primary
 public class RazorpayPaymentGateway implements IPaymentGateway {
 
     private final RazorpayClient razorpayClient;
@@ -34,6 +32,16 @@ public class RazorpayPaymentGateway implements IPaymentGateway {
         this.currency = currency;
         this.linkExpiry = linkExpiry;
         this.callbackUrl = callbackUrl;
+    }
+
+    @Override
+    public String name() {
+        return "RAZORPAY";
+    }
+
+    @Override
+    public String currency() {
+        return currency.toUpperCase();
     }
 
     @Override

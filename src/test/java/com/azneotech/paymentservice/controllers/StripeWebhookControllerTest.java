@@ -1,7 +1,7 @@
 package com.azneotech.paymentservice.controllers;
 
 import com.azneotech.paymentservice.messaging.PaymentResultMessage;
-import com.azneotech.paymentservice.messaging.PaymentResultPublisher;
+import com.azneotech.paymentservice.services.PaymentLedger;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -22,8 +22,8 @@ class StripeWebhookControllerTest {
 
     private static final String SECRET = "whsec_test";
 
-    private final PaymentResultPublisher publisher = mock(PaymentResultPublisher.class);
-    private final StripeWebhookController controller = new StripeWebhookController(new ObjectMapper(), publisher, SECRET);
+    private final PaymentLedger ledger = mock(PaymentLedger.class);
+    private final StripeWebhookController controller = new StripeWebhookController(new ObjectMapper(), ledger, SECRET);
 
     private static String event(String type, String paymentStatus, String orderId) {
         return """
@@ -44,7 +44,7 @@ class StripeWebhookControllerTest {
         String payload = event("checkout.session.completed", "paid", "ORD-1");
 
         assertThat(controller.onEvent(payload, sign(payload, SECRET)).getStatusCode()).isEqualTo(HttpStatus.OK);
-        verify(publisher).publish(new PaymentResultMessage("ORD-1", PaymentResultMessage.Status.PAID, null, null));
+        verify(ledger).recordOutcome("ORD-1", PaymentResultMessage.Status.PAID, "STRIPE", null, null, null);
     }
 
     @Test
@@ -53,9 +53,9 @@ class StripeWebhookControllerTest {
         String settled = event("checkout.session.async_payment_succeeded", "paid", "ORD-1");
 
         controller.onEvent(unpaid, sign(unpaid, SECRET));
-        verify(publisher, never()).publish(any());
+        verify(ledger, never()).recordOutcome(any(), any(), any(), any(), any(), any());
         controller.onEvent(settled, sign(settled, SECRET));
-        verify(publisher).publish(new PaymentResultMessage("ORD-1", PaymentResultMessage.Status.PAID, null, null));
+        verify(ledger).recordOutcome("ORD-1", PaymentResultMessage.Status.PAID, "STRIPE", null, null, null);
     }
 
     @Test
@@ -66,8 +66,8 @@ class StripeWebhookControllerTest {
         controller.onEvent(expired, sign(expired, SECRET));
         controller.onEvent(failed, sign(failed, SECRET));
 
-        verify(publisher).publish(new PaymentResultMessage("ORD-2", PaymentResultMessage.Status.FAILED, null, "Payment failed or the payment link expired"));
-        verify(publisher).publish(new PaymentResultMessage("ORD-3", PaymentResultMessage.Status.FAILED, null, "Payment failed or the payment link expired"));
+        verify(ledger).recordOutcome("ORD-2", PaymentResultMessage.Status.FAILED, "STRIPE", null, null, "Payment failed or the payment link expired");
+        verify(ledger).recordOutcome("ORD-3", PaymentResultMessage.Status.FAILED, "STRIPE", null, null, "Payment failed or the payment link expired");
     }
 
     @Test
@@ -78,16 +78,16 @@ class StripeWebhookControllerTest {
         assertThat(controller.onEvent(payload, sign(payload, "someone-elses-secret")).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(controller.onEvent(payload, sign(other, SECRET)).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(controller.onEvent(payload, null).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        verify(publisher, never()).publish(any());
+        verify(ledger, never()).recordOutcome(any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void withoutAConfiguredSecretEverythingIsRejected() throws Exception {
-        StripeWebhookController unconfigured = new StripeWebhookController(new ObjectMapper(), publisher, "");
+        StripeWebhookController unconfigured = new StripeWebhookController(new ObjectMapper(), ledger, "");
         String payload = event("checkout.session.completed", "paid", "ORD-1");
 
         assertThat(unconfigured.onEvent(payload, sign(payload, SECRET)).getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
-        verify(publisher, never()).publish(any());
+        verify(ledger, never()).recordOutcome(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -97,7 +97,18 @@ class StripeWebhookControllerTest {
 
         assertThat(controller.onEvent(noOrder, sign(noOrder, SECRET)).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(controller.onEvent(other, sign(other, SECRET)).getStatusCode()).isEqualTo(HttpStatus.OK);
-        verify(publisher, never()).publish(any());
+        verify(ledger, never()).recordOutcome(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void aPaidSessionPassesThePaymentIntentToTheLedger() throws Exception {
+        String payload = """
+                {"type":"checkout.session.completed","data":{"object":{"id":"cs_1","payment_status":"paid",
+                 "payment_intent":"pi_7","metadata":{"orderId":"ORD-1"}}}}""";
+
+        controller.onEvent(payload, sign(payload, SECRET));
+
+        verify(ledger).recordOutcome("ORD-1", PaymentResultMessage.Status.PAID, "STRIPE", "pi_7", null, null);
     }
 
 }
