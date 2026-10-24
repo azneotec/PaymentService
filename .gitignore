@@ -18,6 +18,8 @@ target/
 *.iws
 *.iml
 *.ipr
+*.swp
+*.swo
 
 ### NetBeans ###
 /nbproject/private/
@@ -32,6 +34,16 @@ build/
 ### VS Code ###
 .vscode/
 
-### Environment / secrets ###
+# Maven
+*.class
+*.jar
+*.war
+
+# OS
+.DS_Store
+Thumbs.db
+CLAUDE.md
+AGENTS.md
+
+# Local secrets
 .env
-!.env.example
