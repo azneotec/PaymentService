@@ -1,0 +1,29 @@
+meta {
+  name: Create Payment - No Token
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/payment
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "amount": 100,
+    "phoneNumber": "+919999999999",
+    "name": "Jane Doe",
+    "email": "jane@example.com",
+    "orderId": "BRUNO-DENIED"
+  }
+}
+
+assert {
+  res.status: eq 401
+}
+
+docs {
+  No bearer token, so the request is rejected before it reaches the controller.
+}

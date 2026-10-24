@@ -1,0 +1,23 @@
+meta {
+  name: Stripe Webhook - No Signature
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/stripeWebhook
+  body: json
+  auth: none
+}
+
+body:json {
+  {"event": "payment_link.paid"}
+}
+
+assert {
+  res.status: eq 400
+}
+
+docs {
+  Without `Stripe-Signature` nothing is parsed: the signature is checked first, because this endpoint decides whether an order counts as paid.
+}

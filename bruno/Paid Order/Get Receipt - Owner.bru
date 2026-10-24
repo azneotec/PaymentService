@@ -1,0 +1,38 @@
+meta {
+  name: Get Receipt - Owner
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/payment/{{orderNumber}}/receipt
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("is the receipt of this order", function () {
+    expect(res.body.receiptNumber).to.equal(`RCT-${bru.getVar("orderNumber")}`);
+    expect(res.body.orderNumber).to.equal(bru.getVar("orderNumber"));
+    expect(res.body.gateway).to.equal("STRIPE");
+    expect(res.body.amountMinor).to.equal(Number(bru.getEnvVar("amount")));
+    expect(res.body.paidAt).to.be.a("string");
+  });
+  test("masks the email address", function () {
+    expect(res.body.customerEmail).to.be.a("string").and.contain("*");
+    expect(res.body.customerEmail).to.not.equal(bru.getVar("userEmail"));
+  });
+}
+
+docs {
+  The customer reads their own receipt. The email is masked in the response; the full receipt went out by email.
+  Stripe does not report the payment method on a checkout session, so `paymentMethod` is empty.
+}

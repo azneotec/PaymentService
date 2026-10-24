@@ -1,0 +1,36 @@
+meta {
+  name: Signup
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{authUrl}}/auth/signup
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "{{userName}}",
+    "email": "{{userEmail}}",
+    "password": "{{userPassword}}",
+    "phoneNumber": "{{userPhone}}"
+  }
+}
+
+script:pre-request {
+  // Email and phone are unique per user, so mint a fresh pair on every run.
+  const stamp = Date.now();
+  bru.setVar("userEmail", `bruno.${stamp}@example.com`);
+  bru.setVar("userPhone", `+65${String(stamp).slice(-8)}`);
+}
+
+assert {
+  res.status: eq 201
+}
+
+docs {
+  Registers a customer with a generated email on user-auth-service and stores `userEmail` and `userPhone`.
+  The receipt is only readable by the customer whose email is on the payment, so the payment link is created with this email.
+}

@@ -202,6 +202,16 @@ The Kafka flow carries no token and is not affected.
 
 Spring Boot Actuator is enabled: `GET /actuator/health`.
 
+### Bruno collection
+
+`bruno/` is a [Bruno](https://www.usebruno.com) collection covering every endpoint above, plus the error cases. Open the folder in Bruno and pick the `Local` (8005) or `Local-9005` environment, then run the folders top to bottom (or the whole collection with `npx @usebruno/cli run -r --env Local` from `bruno/`).
+
+- **Auth** signs up a customer and logs in the customer and the admin on user-auth-service (`authUrl`, 8001), so start it first (`make up` from the repository root).
+- **Paid Order** is the whole life cycle without a browser: the admin creates a payment link, a correctly signed Stripe webhook is played, and the customer reads the receipt. Creating the link calls Stripe, so this folder needs a real Stripe test key as `STRIPE_API_KEY`.
+- **Webhooks** and **Errors** need no Stripe account. The webhook requests sign their own body, so they work only if the secrets match: the secret environment variables `stripeWebhookSecret` and `razorpayWebhookSecret` must equal the service's `STRIPE_WEBHOOK_SECRET` and `RAZORPAY_WEBHOOK_SECRET`. `adminPassword` is a secret variable too (the seeded local admin is described in UserAuthService's README). With the CLI, pass them as `--env-var name=value`.
+
+The webhook requests publish real messages on `payment-result` (and `order-notification` for a receipt), so point them at a throwaway setup if other services are consuming.
+
 ## Transaction log
 
 Two MySQL tables, created by Flyway (`src/main/resources/migration`):

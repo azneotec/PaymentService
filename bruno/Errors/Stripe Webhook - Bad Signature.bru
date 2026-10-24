@@ -1,0 +1,27 @@
+meta {
+  name: Stripe Webhook - Bad Signature
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/stripeWebhook
+  body: json
+  auth: none
+}
+
+headers {
+  Stripe-Signature: t=1,v1=deadbeef
+}
+
+body:json {
+  {"event": "payment_link.paid"}
+}
+
+assert {
+  res.status: eq 400
+}
+
+docs {
+  A signature that does not match the body is rejected.
+}

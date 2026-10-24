@@ -1,0 +1,40 @@
+meta {
+  name: Login as Admin
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{authUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "{{adminEmail}}",
+    "password": "{{adminPassword}}"
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setVar("adminToken", res.body.token);
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("holds ROLE_ADMIN", function () {
+    expect(res.body.user.roles).to.include("ROLE_ADMIN");
+  });
+}
+
+docs {
+  Logs in as the admin seeded by user-auth-service and stores the JWT as `adminToken`. `POST /payment` needs ROLE_ADMIN.
+  The password is a secret variable: set `adminPassword` in the environment (the seeded local one is in
+  UserAuthService's README), or pass `--env-var adminPassword=...` to the CLI.
+}

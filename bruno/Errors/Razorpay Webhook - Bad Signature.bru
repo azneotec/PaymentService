@@ -1,0 +1,27 @@
+meta {
+  name: Razorpay Webhook - Bad Signature
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/razorpayWebhook
+  body: json
+  auth: none
+}
+
+headers {
+  X-Razorpay-Signature: deadbeef
+}
+
+body:json {
+  {"event": "payment_link.paid"}
+}
+
+assert {
+  res.status: eq 400
+}
+
+docs {
+  A signature that does not match the body is rejected.
+}

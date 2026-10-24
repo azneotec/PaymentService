@@ -1,0 +1,48 @@
+meta {
+  name: Stripe Webhook - Replay
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/stripeWebhook
+  body: json
+  auth: none
+}
+
+body:json {
+  {}
+}
+
+script:pre-request {
+  const CryptoJS = require("crypto-js");
+  const now = Date.now();
+  const payload = JSON.stringify({
+    id: `evt_bruno_${now}`,
+    object: "event",
+    type: "checkout.session.completed",
+    data: {
+      object: {
+        id: `cs_test_bruno_${now}`,
+        object: "checkout.session",
+        payment_status: "paid",
+        payment_intent: `pi_bruno_${now}`,
+        metadata: { orderId: bru.getVar("orderNumber") }
+      }
+    }
+  });
+  const t = Math.floor(now / 1000);
+  const v1 = CryptoJS.HmacSHA256(`${t}.${payload}`, bru.getEnvVar("stripeWebhookSecret")).toString(CryptoJS.enc.Hex);
+  req.setHeader("Content-Type", "application/json");
+  req.setHeader("Stripe-Signature", `t=${t},v1=${v1}`);
+  req.setBody(payload);
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Stripe retries webhooks, so a repeated PAID event must be harmless: the service logs it but does not publish a second
+  `payment-result` or send a second receipt email.
+}

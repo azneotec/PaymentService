@@ -1,0 +1,11 @@
+meta {
+  name: Paid Order
+  seq: 3
+}
+
+docs {
+  The whole payment life cycle without a browser: an admin creates a Stripe payment link, the Stripe webhook is
+  simulated with a correctly signed event, and the customer reads the receipt. Needs a real Stripe test key
+  (STRIPE_API_KEY) and STRIPE_WEBHOOK_SECRET on the service, with the same secret in the `stripeWebhookSecret`
+  environment variable. Run Auth first, and the requests here top to bottom.
+}

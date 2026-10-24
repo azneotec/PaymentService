@@ -4,6 +4,7 @@
 .idea
 .run
 target
+bruno
 HELP.md
 *.md
 docker-compose.yml

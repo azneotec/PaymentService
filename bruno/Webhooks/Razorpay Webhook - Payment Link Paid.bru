@@ -1,0 +1,45 @@
+meta {
+  name: Razorpay Webhook - Payment Link Paid
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/razorpayWebhook
+  body: json
+  auth: none
+}
+
+body:json {
+  {}
+}
+
+script:pre-request {
+  // Razorpay signs the raw body with HMAC-SHA256 (hex) in X-Razorpay-Signature, so the body is built here and sent
+  // as exactly the string that is signed.
+  const CryptoJS = require("crypto-js");
+  const now = Date.now();
+  const orderNumber = `BRUNO-RZP-${now}`;
+  bru.setVar("razorpayOrderNumber", orderNumber);
+  const payload = JSON.stringify({
+    entity: "event",
+    event: "payment_link.paid",
+    payload: {
+      payment_link: { entity: { id: `plink_bruno_${now}`, reference_id: orderNumber, status: "paid" } },
+      payment: { entity: { id: `pay_bruno_${now}`, method: "upi", status: "captured" } }
+    }
+  });
+  const signature = CryptoJS.HmacSHA256(payload, bru.getEnvVar("razorpayWebhookSecret")).toString(CryptoJS.enc.Hex);
+  req.setHeader("Content-Type", "application/json");
+  req.setHeader("X-Razorpay-Signature", signature);
+  req.setBody(payload);
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Plays Razorpay's `payment_link.paid` for a made-up order (`razorpayOrderNumber`). With no payment row for it the
+  service still publishes PAID on `payment-result`, as it always has, so every consumer of that topic sees it.
+}

@@ -1,0 +1,24 @@
+meta {
+  name: Get Receipt - Admin
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/payment/{{orderNumber}}/receipt
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.orderNumber: eq {{orderNumber}}
+}
+
+docs {
+  An admin can read any customer's receipt.
+}

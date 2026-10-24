@@ -1,0 +1,23 @@
+meta {
+  name: Get Receipt - Unknown Order
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/payment/BRUNO-UNKNOWN/receipt
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+assert {
+  res.status: eq 404
+}
+
+docs {
+  No payment for this order. Someone else's receipt answers 404 too, so order numbers cannot be probed.
+}

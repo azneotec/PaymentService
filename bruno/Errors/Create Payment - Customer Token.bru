@@ -1,0 +1,33 @@
+meta {
+  name: Create Payment - Customer Token
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/payment
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "amount": 100,
+    "phoneNumber": "+919999999999",
+    "name": "Jane Doe",
+    "email": "jane@example.com",
+    "orderId": "BRUNO-DENIED"
+  }
+}
+
+assert {
+  res.status: eq 403
+}
+
+docs {
+  A valid ROLE_USER token is not enough: creating a payment link is admin only.
+}

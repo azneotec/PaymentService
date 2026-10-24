@@ -1,0 +1,19 @@
+meta {
+  name: Get Receipt - No Token
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/payment/BRUNO-UNKNOWN/receipt
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 401
+}
+
+docs {
+  No bearer token.
+}

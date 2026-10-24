@@ -1,0 +1,39 @@
+meta {
+  name: Login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{authUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "{{userEmail}}",
+    "password": "{{userPassword}}"
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setVar("token", res.body.token);
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("returns a bearer token", function () {
+    expect(res.body.tokenType).to.equal("Bearer");
+    expect(res.body.token).to.be.a("string").and.not.empty;
+  });
+}
+
+docs {
+  Logs in as the customer created by Signup and stores the JWT as `token` (ROLE_USER). Run Signup first.
+}

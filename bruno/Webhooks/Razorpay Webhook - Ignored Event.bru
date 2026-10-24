@@ -1,0 +1,32 @@
+meta {
+  name: Razorpay Webhook - Ignored Event
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/razorpayWebhook
+  body: json
+  auth: none
+}
+
+body:json {
+  {}
+}
+
+script:pre-request {
+  const CryptoJS = require("crypto-js");
+  const payload = JSON.stringify({ entity: "event", event: "payment.authorized", payload: {} });
+  const signature = CryptoJS.HmacSHA256(payload, bru.getEnvVar("razorpayWebhookSecret")).toString(CryptoJS.enc.Hex);
+  req.setHeader("Content-Type", "application/json");
+  req.setHeader("X-Razorpay-Signature", signature);
+  req.setBody(payload);
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  A validly signed event the service does not act on is answered 200 (so Razorpay stops retrying) and publishes nothing.
+}

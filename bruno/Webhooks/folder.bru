@@ -1,0 +1,10 @@
+meta {
+  name: Webhooks
+  seq: 4
+}
+
+docs {
+  Gateway callbacks. They need no token: each is authenticated by its gateway signature, which these requests compute
+  from the `stripeWebhookSecret` / `razorpayWebhookSecret` environment variables (they must equal the service's
+  STRIPE_WEBHOOK_SECRET / RAZORPAY_WEBHOOK_SECRET).
+}

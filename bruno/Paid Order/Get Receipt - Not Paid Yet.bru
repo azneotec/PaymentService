@@ -1,0 +1,23 @@
+meta {
+  name: Get Receipt - Not Paid Yet
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/payment/{{orderNumber}}/receipt
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+assert {
+  res.status: eq 409
+}
+
+docs {
+  The payment exists but is still waiting for the customer, so there is no receipt yet.
+}

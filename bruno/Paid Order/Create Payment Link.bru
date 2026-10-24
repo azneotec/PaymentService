@@ -1,0 +1,46 @@
+meta {
+  name: Create Payment Link
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/payment
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+
+body:json {
+  {
+    "amount": {{amount}},
+    "phoneNumber": "{{userPhone}}",
+    "name": "{{userName}}",
+    "email": "{{userEmail}}",
+    "orderId": "{{orderNumber}}"
+  }
+}
+
+script:pre-request {
+  // The order number is the correlation key end to end, and a PAID order is final, so mint a fresh one each run.
+  bru.setVar("orderNumber", `BRUNO-${Date.now()}`);
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  test("returns the payment link", function () {
+    expect(res.body).to.be.a("string").and.match(/^https?:\/\//);
+  });
+}
+
+docs {
+  Creates a Stripe payment link (the default gateway) and returns its URL as plain text. Admin only.
+  `email` is the customer created by Signup, so that customer is the one allowed to read the receipt.
+  This calls Stripe for real: with a dummy or invalid key the service answers 500.
+}
