@@ -43,8 +43,9 @@ The Razorpay credentials are read from these properties:
 | `razorpay.key.id`     | Razorpay key ID     |
 | `razorpay.key.secret` | Razorpay key secret |
 | `razorpay.webhook.secret` | Secret that signs Razorpay webhooks; empty rejects every webhook |
+| `stripe.apiKey`, `stripe.webhook.secret` | Optional: only for Stripe (`STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`) |
 
-`application.properties` maps them from the `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` variables. For local development, copy the example file and fill in your keys:
+`application.properties` maps them from the `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` variables (the Stripe ones are optional). For local development, copy the example file and fill in your keys:
 
 ```bash
 cp .env.example .env
@@ -141,14 +142,21 @@ The order is found from the link's `reference_id`. The `X-Razorpay-Signature` he
 
 Spring Boot Actuator is enabled: `GET /actuator/health`.
 
+## Gateways
+
+`RazorpayPaymentGateway` is `@Primary`, so `POST /payment` and the Kafka flow create Razorpay links. `StripePaymentGateway` is a second `IPaymentGateway` bean; to switch, move `@Primary` to it. Both receive the same call (amount in the smallest currency unit, customer details, order number) and both put the order number on the link so their webhook can find the order.
+
+| | Razorpay (default) | Stripe |
+|---|---|---|
+| Currency | `razorpay.currency` (`INR`) | `stripe.currency` (`inr`) |
+| Link | `reference_id` = order number, full amount only, expires after `razorpay.link.expiry` (`24h`, Razorpay needs at least 15 minutes) | one-time price named `Order <number>`, order number in the link's `orderId` metadata |
+| After paying | `razorpay.callback-url` (`RAZORPAY_CALLBACK_URL`), omitted when empty | `stripe.redirect-url` (`STRIPE_REDIRECT_URL`), Stripe's own page when empty |
+| Webhook | `POST /razorpayWebhook`, `RAZORPAY_WEBHOOK_SECRET` | `POST /stripeWebhook`, `STRIPE_WEBHOOK_SECRET` |
+
+The Stripe webhook verifies the `Stripe-Signature` header and reports `checkout.session.completed` (when `payment_status` is `paid`) and `checkout.session.async_payment_succeeded` as `PAID`, and `checkout.session.expired` and `checkout.session.async_payment_failed` as `FAILED`. Create the Stripe webhook for those four events. `STRIPE_API_KEY` is only needed when Stripe is used; without it the service still starts.
+
 ## Known limitations
 
-These are hardcoded in `RazorpayPaymentGateway` and should be changed before real use:
-
-- Currency is fixed to `INR`, whatever `currency` a `payment-requested` message carries.
-- `StripePaymentGateway` is `@Primary`, so payment links (from `POST /payment` and from Kafka) are currently created through Stripe, with a fixed monthly "Gold Plan" price in USD, while the webhook above only understands Razorpay events. Make `RazorpayPaymentGateway` the primary gateway before relying on `PAID` coming back.
-- Link expiry (`expire_by`) is a fixed timestamp (`1791590400`, early October 2026), so links created after that date will be rejected by Razorpay.
-- The description (`Payment for policy no #23456`), the `policy_name` note and the `callback_url` are placeholder values.
-- The customer's `name` and `contact` fields are swapped: the phone number is sent as the name, and the name as the contact.
-- There is no request validation on `POST /payment`, no Stripe webhook handling and no payment status endpoint.
-- If Kafka is down when a `payment-result` is published, the webhook answers 500 so Razorpay retries it; the `payment-requested` listener is retried a few times and then the message is dropped (and a retry can create a second payment link for the order).
+- The currency comes from configuration, not from the `currency` field of a `payment-requested` message.
+- There is no request validation on `POST /payment` and no payment status endpoint.
+- If Kafka is down when a `payment-result` is published, the webhook answers 500 so the gateway retries it; the `payment-requested` listener is retried a few times and then the message is dropped (and a retry can create a second payment link for the order).

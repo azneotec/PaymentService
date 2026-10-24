@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.Clock;
+
 @Configuration
 public class RazorpayConfig {
 
@@ -18,6 +20,12 @@ public class RazorpayConfig {
     @Bean
     public RazorpayClient getRazorpayClient() throws RazorpayException {
         return new RazorpayClient(razorpayKeyId, razorpayKeySecret);
+    }
+
+    /** The time source for link expiry; a bean so tests can fix it. */
+    @Bean
+    public Clock clock() {
+        return Clock.systemUTC();
     }
 
 }
